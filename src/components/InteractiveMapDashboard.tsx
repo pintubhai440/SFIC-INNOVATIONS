@@ -65,21 +65,16 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
     // URL Encode to handle spaces in district names
     const encodedDistrict = encodeURIComponent(districtName);
 
-    // Direct Government API URL
-    const wrisUrl = `https://indiawris.gov.in/Dataset/Reservoir?stateName=Andhra%20Pradesh&districtName=${encodedDistrict}&agencyName=APWRIMS&startdate=${startDate}&enddate=${endDate}&download=false&page=1&size=100`;
-
     try {
-      // Direct POST request bypassing Vercel
-      const response = await fetch(wrisUrl, { 
-        method: 'POST',
+      const response = await fetch(`/api/wris?district=${encodedDistrict}`, { 
+        method: 'GET',
         headers: {
-          'accept': 'application/json'
-        },
-        body: '' // Empty body as required by the API
+          'Accept': 'application/json'
+        }
       });
 
       if (!response.ok) {
-         console.error("Govt API Error:", response.status);
+         console.warn("WRIS API response status:", response.status);
          return;
       }
 
@@ -88,7 +83,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
       setLiveWrisData(data);
       
     } catch (error) {
-      console.error("Direct fetch request failed:", error);
+      console.warn("Live fetch request failed:", error);
     } finally {
       setIsFetchingLive(false);
     }
@@ -389,26 +384,43 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
                 
                 {isFetchingLive ? (
                   <span className="text-xs text-slate-500 block mt-2">Fetching live APWRIMS telemetry...</span>
-                ) : liveWrisData?.data && liveWrisData.data.length > 0 ? (
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <span className="text-[11px] text-slate-600 font-medium block truncate max-w-[180px]">
-                        {liveWrisData.data[0].reservoirName}
+                ) : (() => {
+                  const records: any[] = Array.isArray(liveWrisData) 
+                    ? liveWrisData 
+                    : liveWrisData?.records || liveWrisData?.data || [];
+                  const rec = records[0];
+                  if (!rec) {
+                    return (
+                      <span className="text-xs text-rose-500 block mt-2 font-medium">
+                        No active telemetry found for {currentWs.district}
                       </span>
-                      <span className="text-lg font-bold font-mono text-cyan-900 block mt-0.5">
-                        {liveWrisData.data[0].currentLiveStorage_MCM} <span className="text-xs font-sans text-cyan-700 font-normal">MCM</span>
-                      </span>
+                    );
+                  }
+                  return (
+                    <div className="flex items-end justify-between mt-1">
+                      <div>
+                        <span className="text-[11px] text-slate-600 font-medium block truncate max-w-[180px]">
+                          {rec.reservoirName || rec.stationName || rec.name || 'APWRIMS Station'}
+                        </span>
+                        <span className="text-lg font-bold font-mono text-cyan-900 block mt-0.5">
+                          {rec.currentLiveStorage_MCM 
+                            ? `${rec.currentLiveStorage_MCM} MCM` 
+                            : rec.currentLiveStorage_BMC 
+                            ? `${rec.currentLiveStorage_BMC} BMC` 
+                            : 'Active Telemetry'}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                         <span className="text-[10px] text-slate-400 block font-mono">
+                           {rec.agencyName || liveWrisData?.agency || 'APWRIMS'}
+                         </span>
+                         <span className="text-[10px] text-slate-600 block font-semibold">
+                           {rec.date || 'Today'}
+                         </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                       <span className="text-[10px] text-slate-400 block font-mono">UPDATED</span>
-                       <span className="text-[10px] text-slate-600 block font-semibold">{liveWrisData.data[0].date}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-xs text-rose-500 block mt-2 font-medium">
-                    No active telemetry found for {currentWs.district}
-                  </span>
-                )}
+                  );
+                })()}
               </div>
             </div>
 

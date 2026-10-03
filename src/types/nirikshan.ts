@@ -1,11 +1,38 @@
 export type WaterBodyStatusColor = 'green' | 'blue' | 'yellow' | 'red' | 'grey';
 
+export type WrisDatasetType = 
+  | 'reservoir' 
+  | 'river_level' 
+  | 'river_discharge' 
+  | 'rainfall' 
+  | 'groundwater' 
+  | 'basin_river_level' 
+  | 'basin_river_discharge' 
+  | 'basin_reservoir' 
+  | 'basin_rainfall';
+
 export interface WaterBody {
   id: string;
   name: string;
   teluguName?: string;
   state?: string; // e.g. "Andhra Pradesh", "Rajasthan", "Maharashtra", "Karnataka", "Punjab", etc.
-  type: 'Lake' | 'Reservoir' | 'River' | 'Canal' | 'Traditional Tank / Cheruvu' | 'Check Dam';
+  type: 'Lake' | 'Reservoir' | 'River' | 'Canal' | 'Traditional Tank / Cheruvu' | 'Check Dam' | 'Rainfall Station' | 'Groundwater Well';
+  datasetType?: WrisDatasetType;
+  endpoint?: string;
+  agency?: string;
+  liveTelemetry?: {
+    storageBMC?: number;
+    storageMCM?: number;
+    fullCapacityMCM?: number;
+    waterLevelM?: number;
+    dangerLevelM?: number;
+    dischargeCusecs?: number;
+    rainfallMm?: number;
+    departurePercent?: number;
+    depthToWaterM_bgl?: number;
+    rechargeTrend?: string;
+    subBasin?: string;
+  };
   district: string;
   mandal: string;
   village: string;

@@ -33,10 +33,23 @@ export default function App() {
   // Default to overview landing page (national map and executive command, not user data)
   const [currentRole, setCurrentRole] = useState<UserRoleType>('overview');
 
-  // Load persisted state or initial seed data
+  // Cache version to automatically purge stale mock data from previous sessions
+  const STORAGE_VERSION = 'v7_isro_bhuvan_wbis';
+
+  // Load persisted state or initial seed data with version check
   const [waterBodies, setWaterBodies] = useState<WaterBody[]>(() => {
-    const saved = localStorage.getItem('nir_water_bodies');
-    return saved ? JSON.parse(saved) : INITIAL_WATER_BODIES;
+    try {
+      const version = localStorage.getItem('nir_storage_version');
+      if (version !== STORAGE_VERSION) {
+        localStorage.setItem('nir_storage_version', STORAGE_VERSION);
+        localStorage.setItem('nir_water_bodies', JSON.stringify(INITIAL_WATER_BODIES));
+        return INITIAL_WATER_BODIES;
+      }
+      const saved = localStorage.getItem('nir_water_bodies');
+      return saved ? JSON.parse(saved) : INITIAL_WATER_BODIES;
+    } catch {
+      return INITIAL_WATER_BODIES;
+    }
   });
 
   const [complaints, setComplaints] = useState<CitizenComplaint[]>(() => {
