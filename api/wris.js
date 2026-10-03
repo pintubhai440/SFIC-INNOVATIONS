@@ -1,5 +1,4 @@
 // api/wris.js
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // Sarkaari sites ke strict SSL error ko bypass karne ki ninja technique
 
 export default async function handler(req, res) {
   // CORS Headers
@@ -15,7 +14,6 @@ export default async function handler(req, res) {
     let endpoint = '/Dataset/Reservoir';
     let payload = {};
 
-    // React frontend se data nikalna
     if (req.method === 'POST') {
       endpoint = req.body?.endpoint || endpoint;
       payload = req.body?.payload || {};
@@ -29,7 +27,6 @@ export default async function handler(req, res) {
     const startdate = payload.startDate || new Date().toISOString().split('T')[0];
     const enddate = payload.endDate || new Date().toISOString().split('T')[0];
 
-    // Sarkaari format me URL Parameters banana
     const wrisBaseUrl = "https://indiawris.gov.in";
     const queryParams = new URLSearchParams({
       stateName: stateName,
@@ -43,25 +40,32 @@ export default async function handler(req, res) {
 
     const targetUrl = `${wrisBaseUrl}${endpoint}?${queryParams.toString()}`;
 
-    // Sarkaari server ko call lagana
+    // Sarkaari firewall ko bypass karne ke liye advanced browser headers
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
-        'accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9,hi;q=0.8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Origin': 'https://indiawris.gov.in',
+        'Referer': 'https://indiawris.gov.in/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
       }
     });
 
     if (!response.ok) {
-      throw new Error(`WRIS ne rok diya. Status Code: ${response.status}`);
+      throw new Error(`Sarkaari server ne status diya: ${response.status}`);
     }
 
     const data = await response.json();
+    
+    // Agar sarkaari server ne empty array diya, toh hum console me print karayenge
     res.status(200).json(data);
 
   } catch (error) {
     res.status(500).json({ 
-      error: "WRIS se live data nahi mil paya bhai!",
+      error: "Proxy bypass fail ho gaya bhai!",
       asli_bimari: error.message 
     });
   }
