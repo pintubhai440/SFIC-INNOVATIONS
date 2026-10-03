@@ -58,19 +58,19 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  // --- 2. LIVE WRIS API FETCH FUNCTION ---
+  // --- 2. LIVE WRIS API FETCH FUNCTION (Updated with better error handling) ---
   const fetchLiveWrisData = async (districtName: string) => {
     setIsFetchingLive(true);
     const today = getTodayDate();
 
     try {
-      const response = await fetch('/api/wris', {
+      const response = await fetch('/api/wris', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          endpoint: '/Dataset/Reservoir', // Tum chaho toh isko bhi activeLayer state se link kar sakte ho
+          endpoint: '/Dataset/Reservoir',
           payload: {
             state: "Andhra Pradesh",
             district: districtName,
@@ -80,11 +80,18 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
         })
       });
 
+      if (!response.ok) {
+         // Agar backend (wris.js) fail hua toh yahan pata chalega
+         const err = await response.json();
+         console.error("Backend ne error bheja:", err);
+         return;
+      }
+
       const data = await response.json();
       console.log(`Live Data for ${districtName}:`, data);
       setLiveWrisData(data);
     } catch (error) {
-      console.error("WRIS data fetch failed:", error);
+      console.error("Fetch request hi fail ho gayi:", error);
     } finally {
       setIsFetchingLive(false);
     }
@@ -97,7 +104,6 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
       fetchLiveWrisData(currentWs.district);
     }
   }, [currentWs?.district]);
-
 
   // Auto-play time slider
   useEffect(() => {
