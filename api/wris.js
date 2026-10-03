@@ -1,61 +1,49 @@
-// api/wris.js
-
 export default async function handler(req, res) {
+  // CORS headers set karein taaki frontend call block na ho
+  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
   try {
-    let endpoint = '/Dataset/Reservoir';
-    let payload = {};
-
-    if (req.method === 'POST') {
-      endpoint = req.body?.endpoint || endpoint;
-      payload = req.body?.payload || {};
-    } else {
-      endpoint = req.query?.endpoint || endpoint;
-      payload = req.query || {};
-    }
-
-    const districtName = payload.district || "Vizianagaram";
+    // Frontend se district name lenge (default Vizianagaram)
+    const districtName = req.query.district || req.body.district || 'Vizianagaram';
     
-    // Sarkaari API ko exact wahi parameters do jo unke Swagger tool me chalte hain
-    const wrisBaseUrl = "https://indiawris.gov.in";
-    const queryParams = new URLSearchParams({
-      stateName: payload.state || "Andhra Pradesh",
-      districtName: districtName,
-      agencyName: "CWC", // Yeh sabse important parameter hai jo missing tha!
-      startdate: payload.startDate || "2026-09-26", // Swagger curl jaisa date format
-      enddate: payload.endDate || "2026-10-03",
-      download: "false",
-      page: "1",
-      size: "100"
-    });
+    // Dynamic dates nikalne ke liye (Last 1 month ka data)
+    const today = new Date();
+    const lastMonth = new Date(today);
+    lastMonth.setDate(today.getDate() - 30);
+    
+    const endDate = today.toISOString().split('T')[0];
+    const startDate = lastMonth.toISOString().split('T')[0];
 
-    const targetUrl = `${wrisBaseUrl}${endpoint}?${queryParams.toString()}`;
-    console.log("Hitting URL:", targetUrl);
+    // WRIS API URL - APWRIMS agency ke sath
+    const wrisUrl = `https://indiawris.gov.in/Dataset/Reservoir?stateName=Andhra%20Pradesh&districtName=${districtName}&agencyName=APWRIMS&startdate=${startDate}&enddate=${endDate}&download=false&page=1&size=100`;
 
-    const response = await fetch(targetUrl, {
+    // Govt API ko POST request bhejenge
+    const response = await fetch(wrisUrl, {
       method: 'POST',
       headers: {
         'accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-      }
+      },
+      body: '' // Body empty rahega jaise curl command me tha
     });
+
+    if (!response.ok) {
+      throw new Error(`WRIS API Error: ${response.status}`);
+    }
 
     const data = await response.json();
     
-    // Seedha sarkaari server ka asli data frontend ko bhej do
-    return res.status(200).json(data);
-
+    // Frontend ko JSON response bhej dein
+    res.status(200).json(data);
+    
   } catch (error) {
-    return res.status(500).json({ 
-      error: "Live data fetch nahi ho paya",
-      asli_bimari: error.message 
-    });
+    console.error("Backend Error:", error);
+    res.status(500).json({ error: 'Data fetch karne me problem aayi', details: error.message });
   }
 }
