@@ -18,7 +18,7 @@ import {
   Sliders,
   CheckCircle2,
   Calendar,
-  Loader2 // Ek naya icon loading animation ke liye add kiya hai
+  Loader2 
 } from 'lucide-react';
 
 interface InteractiveMapDashboardProps {
@@ -58,9 +58,10 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  // --- 2. LIVE WRIS API FETCH FUNCTION (Updated with better error handling) ---
+  // --- 2. LIVE WRIS API FETCH FUNCTION ---
   const fetchLiveWrisData = async (districtName: string) => {
     setIsFetchingLive(true);
+    setLiveWrisData(null); // Naya fetch shuru hone par purana data clear kar do
     const today = getTodayDate();
 
     try {
@@ -81,7 +82,6 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
       });
 
       if (!response.ok) {
-         // Agar backend (wris.js) fail hua toh yahan pata chalega
          const err = await response.json();
          console.error("Backend ne error bheja:", err);
          return;
@@ -100,7 +100,6 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
   // --- 3. TRIGGER API CALL WHEN DISTRICT CHANGES ---
   useEffect(() => {
     if (currentWs?.district) {
-      // Jab bhi user naya district select karega, API apne aap chalegi
       fetchLiveWrisData(currentWs.district);
     }
   }, [currentWs?.district]);
@@ -150,7 +149,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
           ))}
         </div>
 
-        {/* Video Styled Surveillance Filter Buttons (All | Alerts | Active) */}
+        {/* Video Styled Surveillance Filter Buttons */}
         <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
           <button
             onClick={() => setFilterMode('all')}
@@ -235,7 +234,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
             />
           </div>
 
-          {/* Time Slider Bar below Map (Roadmap §13) */}
+          {/* Time Slider Bar below Map */}
           <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <button
@@ -275,7 +274,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
             </div>
           </div>
 
-          {/* Bottom Bar matching Video */}
+          {/* Bottom Bar */}
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 px-2 font-mono">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -384,6 +383,39 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
                 <span className="text-[10px] text-slate-500 block truncate" title={currentWs.soilType}>
                   {currentWs.soilType.split('(')[0]}
                 </span>
+              </div>
+
+              {/* LIVE WRIS DATA COMPONENT */}
+              <div className="bg-cyan-50/50 border border-cyan-200 p-3 rounded-lg col-span-2">
+                <div className="flex items-center justify-between border-b border-cyan-100 pb-1 mb-2">
+                  <span className="text-[10px] text-cyan-800 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    <Droplet className="w-3 h-3" /> Live Reservoir Status (WRIS)
+                  </span>
+                  {isFetchingLive && <Loader2 className="w-3 h-3 animate-spin text-cyan-600" />}
+                </div>
+                
+                {isFetchingLive ? (
+                  <span className="text-xs text-slate-500 block mt-2">Fetching live APWRIMS telemetry...</span>
+                ) : liveWrisData?.data && liveWrisData.data.length > 0 ? (
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <span className="text-[11px] text-slate-600 font-medium block truncate max-w-[180px]">
+                        {liveWrisData.data[0].reservoirName}
+                      </span>
+                      <span className="text-lg font-bold font-mono text-cyan-900 block mt-0.5">
+                        {liveWrisData.data[0].currentLiveStorage_MCM} <span className="text-xs font-sans text-cyan-700 font-normal">MCM</span>
+                      </span>
+                    </div>
+                    <div className="text-right">
+                       <span className="text-[10px] text-slate-400 block font-mono">UPDATED</span>
+                       <span className="text-[10px] text-slate-600 block font-semibold">{liveWrisData.data[0].date}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs text-rose-500 block mt-2 font-medium">
+                    No active telemetry found for {currentWs.district}
+                  </span>
+                )}
               </div>
             </div>
 
