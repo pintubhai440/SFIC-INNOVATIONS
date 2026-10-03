@@ -1,7 +1,8 @@
 // api/wris.js
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // Sarkaari sites ke strict SSL error ko bypass karne ki ninja technique
 
 export default async function handler(req, res) {
-  // 1. CORS Headers
+  // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -14,7 +15,7 @@ export default async function handler(req, res) {
     let endpoint = '/Dataset/Reservoir';
     let payload = {};
 
-    // 2. React frontend se aane wala data pakdo
+    // React frontend se data nikalna
     if (req.method === 'POST') {
       endpoint = req.body?.endpoint || endpoint;
       payload = req.body?.payload || {};
@@ -23,18 +24,16 @@ export default async function handler(req, res) {
       payload = req.query || {};
     }
 
-    // 3. Variables set karo (Agar frontend se na aaye, toh default AP ki dates lagao)
     const stateName = payload.state || "Andhra Pradesh";
     const districtName = payload.district || "Vizianagaram";
     const startdate = payload.startDate || new Date().toISOString().split('T')[0];
     const enddate = payload.endDate || new Date().toISOString().split('T')[0];
 
-    // 4. Exactly screenshot ki tarah URL Parameters banao
+    // Sarkaari format me URL Parameters banana
     const wrisBaseUrl = "https://indiawris.gov.in";
     const queryParams = new URLSearchParams({
       stateName: stateName,
       districtName: districtName,
-      // agencyName: "APWRIMS", // Optional: Jo tumhari Excel file me tha
       startdate: startdate,
       enddate: enddate,
       download: "false",
@@ -42,25 +41,22 @@ export default async function handler(req, res) {
       size: "100"
     });
 
-    // 5. Final Target URL (e.g., https://indiawris.gov.in/Dataset/Reservoir?stateName=...)
     const targetUrl = `${wrisBaseUrl}${endpoint}?${queryParams.toString()}`;
-    console.log("Calling Sarkaari API:", targetUrl); // Vercel logs ke liye
 
-    // 6. Request bhejo, par body ekdum empty rakhna hai jaisa curl me tha (-d '')
+    // Sarkaari server ko call lagana
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
-        'accept': 'application/json'
+        'accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 
     if (!response.ok) {
-      throw new Error(`WRIS ne gussa kiya. Status: ${response.status}`);
+      throw new Error(`WRIS ne rok diya. Status Code: ${response.status}`);
     }
 
     const data = await response.json();
-    
-    // Screenshot me dikha hai ki successful call hone par bhi kabhi data array empty aa sakta hai
     res.status(200).json(data);
 
   } catch (error) {
