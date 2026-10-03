@@ -17,7 +17,8 @@ import {
   Compass,
   Sliders,
   CheckCircle2,
-  Calendar
+  Calendar,
+  Loader2 // Ek naya icon loading animation ke liye add kiya hai
 } from 'lucide-react';
 
 interface InteractiveMapDashboardProps {
@@ -42,7 +43,61 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
   const [activeTimeYear, setActiveTimeYear] = useState<number>(2026);
   const [isPlayingTimeline, setIsPlayingTimeline] = useState<boolean>(false);
 
+  // --- API INTEGRATION STATES ---
+  const [liveWrisData, setLiveWrisData] = useState<any>(null);
+  const [isFetchingLive, setIsFetchingLive] = useState<boolean>(false);
+
   const currentWs = watersheds.find((w) => w.id === selectedWatershedId) || watersheds[0];
+
+  // --- 1. DYNAMIC DATE FUNCTION ---
+  const getTodayDate = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // --- 2. LIVE WRIS API FETCH FUNCTION ---
+  const fetchLiveWrisData = async (districtName: string) => {
+    setIsFetchingLive(true);
+    const today = getTodayDate();
+
+    try {
+      const response = await fetch('/api/wris', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          endpoint: '/Dataset/Reservoir', // Tum chaho toh isko bhi activeLayer state se link kar sakte ho
+          payload: {
+            state: "Andhra Pradesh",
+            district: districtName,
+            startDate: today,
+            endDate: today
+          }
+        })
+      });
+
+      const data = await response.json();
+      console.log(`Live Data for ${districtName}:`, data);
+      setLiveWrisData(data);
+    } catch (error) {
+      console.error("WRIS data fetch failed:", error);
+    } finally {
+      setIsFetchingLive(false);
+    }
+  };
+
+  // --- 3. TRIGGER API CALL WHEN DISTRICT CHANGES ---
+  useEffect(() => {
+    if (currentWs?.district) {
+      // Jab bhi user naya district select karega, API apne aap chalegi
+      fetchLiveWrisData(currentWs.district);
+    }
+  }, [currentWs?.district]);
+
 
   // Auto-play time slider
   useEffect(() => {
@@ -145,11 +200,20 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
                 National Micro-Watershed Geospatial Telemetry
               </h3>
             </div>
+            
+            {/* API Status UI Integration */}
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded flex items-center gap-1 font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                LIVE DWLR SYNCHRONIZED
-              </span>
+              {isFetchingLive ? (
+                <span className="text-[11px] font-mono text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded flex items-center gap-1 font-semibold">
+                  <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                  SYNCING INDIA-WRIS...
+                </span>
+              ) : (
+                <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded flex items-center gap-1 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  LIVE DWLR SYNCHRONIZED
+                </span>
+              )}
             </div>
           </div>
 
