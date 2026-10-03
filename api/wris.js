@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // CORS headers set karein taaki frontend call block na ho
+  // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -10,10 +10,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Frontend se district name lenge (default Vizianagaram)
-    const districtName = req.query.district || req.body.district || 'Vizianagaram';
+    // SAFE WAY TO GET DISTRICT NAME
+    // Optional chaining (?.) prevents crash if req.body is undefined
+    let districtName = 'Vizianagaram';
     
-    // Dynamic dates nikalne ke liye (Last 1 month ka data)
+    if (req.method === 'POST') {
+      // Check both nested payload (from InteractiveMapDashboard) or direct body
+      districtName = req.body?.payload?.district || req.body?.district || 'Vizianagaram';
+    } else if (req.method === 'GET') {
+      // Check query string for GET requests
+      districtName = req.query?.district || 'Vizianagaram';
+    }
+
     const today = new Date();
     const lastMonth = new Date(today);
     lastMonth.setDate(today.getDate() - 30);
@@ -21,16 +29,14 @@ export default async function handler(req, res) {
     const endDate = today.toISOString().split('T')[0];
     const startDate = lastMonth.toISOString().split('T')[0];
 
-    // WRIS API URL - APWRIMS agency ke sath
     const wrisUrl = `https://indiawris.gov.in/Dataset/Reservoir?stateName=Andhra%20Pradesh&districtName=${districtName}&agencyName=APWRIMS&startdate=${startDate}&enddate=${endDate}&download=false&page=1&size=100`;
 
-    // Govt API ko POST request bhejenge
     const response = await fetch(wrisUrl, {
-      method: 'POST',
+      method: 'POST', // WRIS govt API requires POST
       headers: {
         'accept': 'application/json',
       },
-      body: '' // Body empty rahega jaise curl command me tha
+      body: ''
     });
 
     if (!response.ok) {
@@ -38,8 +44,6 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    
-    // Frontend ko JSON response bhej dein
     res.status(200).json(data);
     
   } catch (error) {
