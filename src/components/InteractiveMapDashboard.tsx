@@ -49,55 +49,52 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
 
   const currentWs = watersheds.find((w) => w.id === selectedWatershedId) || watersheds[0];
 
-  // --- 1. DYNAMIC DATE FUNCTION ---
-  const getTodayDate = () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  // --- 2. LIVE WRIS API FETCH FUNCTION ---
+  // --- 1. DIRECT BROWSER FETCH FUNCTION ---
   const fetchLiveWrisData = async (districtName: string) => {
     setIsFetchingLive(true);
-    setLiveWrisData(null); // Naya fetch shuru hone par purana data clear kar do
-    const today = getTodayDate();
+    setLiveWrisData(null); // Clear previous data
+    
+    // Calculate Dates (Last 30 days)
+    const today = new Date();
+    const lastMonth = new Date(today);
+    lastMonth.setDate(today.getDate() - 30);
+    
+    const endDate = today.toISOString().split('T')[0];
+    const startDate = lastMonth.toISOString().split('T')[0];
+
+    // URL Encode to handle spaces in district names
+    const encodedDistrict = encodeURIComponent(districtName);
+
+    // Direct Government API URL
+    const wrisUrl = `https://indiawris.gov.in/Dataset/Reservoir?stateName=Andhra%20Pradesh&districtName=${encodedDistrict}&agencyName=APWRIMS&startdate=${startDate}&enddate=${endDate}&download=false&page=1&size=100`;
 
     try {
-      const response = await fetch('/api/wris', { 
+      // Direct POST request bypassing Vercel
+      const response = await fetch(wrisUrl, { 
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'accept': 'application/json'
         },
-        body: JSON.stringify({
-          endpoint: '/Dataset/Reservoir',
-          payload: {
-            state: "Andhra Pradesh",
-            district: districtName,
-            startDate: today,
-            endDate: today
-          }
-        })
+        body: '' // Empty body as required by the API
       });
 
       if (!response.ok) {
-         const err = await response.json();
-         console.error("Backend ne error bheja:", err);
+         console.error("Govt API Error:", response.status);
          return;
       }
 
       const data = await response.json();
       console.log(`Live Data for ${districtName}:`, data);
       setLiveWrisData(data);
+      
     } catch (error) {
-      console.error("Fetch request hi fail ho gayi:", error);
+      console.error("Direct fetch request failed:", error);
     } finally {
       setIsFetchingLive(false);
     }
   };
 
-  // --- 3. TRIGGER API CALL WHEN DISTRICT CHANGES ---
+  // --- 2. TRIGGER API CALL WHEN DISTRICT CHANGES ---
   useEffect(() => {
     if (currentWs?.district) {
       fetchLiveWrisData(currentWs.district);
@@ -149,7 +146,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
           ))}
         </div>
 
-        {/* Video Styled Surveillance Filter Buttons */}
+        {/* Surveillance Filter Buttons */}
         <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
           <button
             onClick={() => setFilterMode('all')}
@@ -193,9 +190,8 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
 
       {/* Main Visual Map & Inspector Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Map Container (7 Cols on large screens) */}
+        {/* Map Container */}
         <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-3 shadow-xs relative flex flex-col justify-between">
-          {/* Top Info Header inside Map Card */}
           <div className="p-2 flex items-center justify-between border-b border-slate-100 mb-2">
             <div>
               <span className="text-[10px] font-mono font-bold tracking-widest text-blue-900/60 uppercase block">
@@ -222,7 +218,6 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
             </div>
           </div>
 
-          {/* Svg Map Canvas */}
           <div className="flex-1 w-full">
             <IndiaMapSvg
               watersheds={watersheds}
@@ -234,7 +229,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
             />
           </div>
 
-          {/* Time Slider Bar below Map */}
+          {/* Time Slider Bar */}
           <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <button
@@ -252,7 +247,6 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
               </div>
             </div>
 
-            {/* Step buttons */}
             <div className="flex items-center gap-2">
               {[2023, 2024, 2025, 2026].map((yr) => (
                 <button
@@ -290,10 +284,9 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
           </div>
         </div>
 
-        {/* Selected Micro-Watershed Quick Inspector Panel (5 Cols) */}
+        {/* Selected Micro-Watershed Quick Inspector Panel */}
         <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
           <div className="space-y-4">
-            {/* Header info */}
             <div className="border-b border-slate-100 pb-3 flex items-start justify-between">
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
@@ -319,7 +312,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
               </span>
             </div>
 
-            {/* Stress Score Gauge & Status Bar */}
+            {/* Stress Score */}
             <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-slate-700">Analytical Stress Score</span>
@@ -343,7 +336,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
               </div>
             </div>
 
-            {/* Metrics Quick Grid */}
+            {/* Metrics Grid */}
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-sky-50/60 border border-sky-100 p-3 rounded-lg">
                 <span className="text-[10px] text-slate-500 block">Observed Piezometer</span>
@@ -419,7 +412,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
               </div>
             </div>
 
-            {/* Why Is It Stressed Snapshot */}
+            {/* Stress Driver Snapshot */}
             <div className="space-y-1.5">
               <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">
                 Primary Stress Driver:
@@ -434,10 +427,10 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
               </div>
             </div>
 
-            {/* Estimated Recovery Forecast Pill */}
+            {/* Estimated Recovery */}
             <div className="p-3 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-xl space-y-1">
               <span className="text-[10px] font-mono text-sky-800 font-bold uppercase tracking-wider block">
-                Modelled Recovery Window (Roadmap §7 & §8)
+                Modelled Recovery Window
               </span>
               <span className="text-xs font-bold text-[#1b2a4a] block">
                 {currentWs.estimatedRecoveryWeeks}
@@ -445,7 +438,7 @@ export const InteractiveMapDashboard: React.FC<InteractiveMapDashboardProps> = (
             </div>
           </div>
 
-          {/* Action CTAs */}
+          {/* Actions */}
           <div className="space-y-2 pt-2 border-t border-slate-100">
             <button
               onClick={onOpenDetailModal}
