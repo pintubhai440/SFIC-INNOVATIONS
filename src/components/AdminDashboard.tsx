@@ -203,7 +203,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* Geospatial Map Section for Admin (State Scope) */}
+      {/* Geospatial Map Section for Admin (Andhra Pradesh Scope) */}
       <InteractiveAndhraMap
         waterBodies={waterBodies}
         complaints={complaints}

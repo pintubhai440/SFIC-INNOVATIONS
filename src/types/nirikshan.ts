@@ -4,8 +4,9 @@ export interface WaterBody {
   id: string;
   name: string;
   teluguName?: string;
+  state?: string; // e.g. "Andhra Pradesh", "Rajasthan", "Maharashtra", "Karnataka", "Punjab", etc.
   type: 'Lake' | 'Reservoir' | 'River' | 'Canal' | 'Traditional Tank / Cheruvu' | 'Check Dam';
-  district: 'Vizianagaram' | 'Parvathipuram Manyam';
+  district: string;
   mandal: string;
   village: string;
   coordinates: { lat: number; lng: number };
@@ -19,7 +20,7 @@ export interface WaterBody {
   imageUrl: string;
 }
 
-export type UserRoleType = 'admin' | 'user' | 'nodal_vizianagaram' | 'nodal_parvathipuram' | 'inspector' | 'engineer';
+export type UserRoleType = 'overview' | 'admin' | 'user' | 'nodal_vizianagaram' | 'nodal_parvathipuram' | 'inspector' | 'engineer';
 
 export interface CitizenComplaint {
   id: string; // e.g. "CMP-AP-2026-101"
@@ -27,7 +28,8 @@ export interface CitizenComplaint {
   citizenAge: number;
   citizenGender: 'Male' | 'Female' | 'Other';
   citizenPhone: string;
-  district: 'Vizianagaram' | 'Parvathipuram Manyam';
+  state?: string;
+  district: string;
   mandal: string;
   village: string;
   locationLandmark: string;
