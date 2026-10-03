@@ -3,299 +3,413 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { MICRO_WATERSHEDS_DATA } from './data/watershedData';
-import { MicroWatershed, RechargeAsset, ActionTask } from './types/watershed';
-import { HeaderNavbar } from './components/HeaderNavbar';
-import { InteractiveMapDashboard } from './components/InteractiveMapDashboard';
-import { WatershedProfileModal } from './components/WatershedProfileModal';
-import { AccountabilityLedgerView } from './components/AccountabilityLedgerView';
-import { RechargeAssetRegistry } from './components/RechargeAssetRegistry';
-import { InterventionSimulator } from './components/InterventionSimulator';
-import { ActionCenter } from './components/ActionCenter';
-import { SeasonalImpactAudit } from './components/SeasonalImpactAudit';
-import { StakeholderEngagementDashboard } from './components/StakeholderEngagementDashboard';
-import { EndangeredComplaintsFeed } from './components/EndangeredComplaintsFeed';
-import { ReportEndangeredModal } from './components/ReportEndangeredModal';
-import { DataIntegritySourcePanel } from './components/DataIntegritySourcePanel';
-import { INITIAL_ENDANGERED_COMPLAINTS } from './data/complaintsData';
-import { EndangeredZoneComplaint } from './types/watershed';
+import React, { useState, useEffect } from 'react';
 import { 
-  Droplets, 
-  ExternalLink, 
-  ShieldCheck, 
-  Award, 
-  Compass, 
-  Info,
-  CheckCircle2
-} from 'lucide-react';
+  UserRoleType, 
+  WaterBody, 
+  CitizenComplaint, 
+  OfficerContact, 
+  InspectorReport,
+  EngineerWorkExecution
+} from './types/nirikshan';
+import { 
+  INITIAL_WATER_BODIES, 
+  INITIAL_OFFICER_CONTACTS, 
+  INITIAL_CITIZEN_COMPLAINTS 
+} from './data/nirikshanData';
+import { NirikshanVerticalSidebar } from './components/NirikshanVerticalSidebar';
+import { NirikshanTopBar } from './components/NirikshanTopBar';
+import { CitizenDashboard } from './components/CitizenDashboard';
+import { NodalOfficerDashboard } from './components/NodalOfficerDashboard';
+import { InspectorDashboard } from './components/InspectorDashboard';
+import { EngineerDashboard } from './components/EngineerDashboard';
+import { AdminDashboard } from './components/AdminDashboard';
+import { LodgeComplaintModal } from './components/LodgeComplaintModal';
+import { OfficerDirectoryModal } from './components/OfficerDirectoryModal';
+import { AuthModal } from './components/AuthModal';
+import { Droplets, Phone } from 'lucide-react';
 
 export default function App() {
-  const [watersheds, setWatersheds] = useState<MicroWatershed[]>(MICRO_WATERSHEDS_DATA);
-  const [selectedWatershedId, setSelectedWatershedId] = useState<string>('ws-kolar-palavanhalli');
-  const [activeTab, setActiveTab] = useState<'map' | 'ledger' | 'assets' | 'simulator' | 'tasks' | 'audit' | 'stakeholders' | 'complaints' | 'sources'>('map');
-  const [userRole, setUserRole] = useState<string>('Watershed Officer (District Level)');
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
-  const [isReportEndangeredModalOpen, setIsReportEndangeredModalOpen] = useState<boolean>(false);
-  const [complaints, setComplaints] = useState<EndangeredZoneComplaint[]>(INITIAL_ENDANGERED_COMPLAINTS);
+  const [currentRole, setCurrentRole] = useState<UserRoleType>('user');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const selectedWatershed = watersheds.find((w) => w.id === selectedWatershedId) || watersheds[0];
+  // Load persisted state or initial seed data
+  const [waterBodies, setWaterBodies] = useState<WaterBody[]>(() => {
+    const saved = localStorage.getItem('nir_water_bodies');
+    return saved ? JSON.parse(saved) : INITIAL_WATER_BODIES;
+  });
 
-  const handleComplaintSubmitted = (newComplaint: EndangeredZoneComplaint) => {
-    setComplaints([newComplaint, ...complaints]);
-    setActiveTab('complaints');
+  const [complaints, setComplaints] = useState<CitizenComplaint[]>(() => {
+    const saved = localStorage.getItem('nir_complaints');
+    return saved ? JSON.parse(saved) : INITIAL_CITIZEN_COMPLAINTS;
+  });
+
+  const [officers] = useState<OfficerContact[]>(INITIAL_OFFICER_CONTACTS);
+
+  // Auth states for the protected roles
+  const [authenticatedRoles, setAuthenticatedRoles] = useState<Record<UserRoleType, boolean>>({
+    user: true,
+    admin: false,
+    nodal_vizianagaram: false,
+    nodal_parvathipuram: false,
+    inspector: false,
+    engineer: false,
+  });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [pendingAuthRole, setPendingAuthRole] = useState<UserRoleType>('admin');
+  const [isLodgeModalOpen, setIsLodgeModalOpen] = useState(false);
+  const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
+
+  // Sync to local storage
+  useEffect(() => {
+    localStorage.setItem('nir_water_bodies', JSON.stringify(waterBodies));
+  }, [waterBodies]);
+
+  useEffect(() => {
+    localStorage.setItem('nir_complaints', JSON.stringify(complaints));
+  }, [complaints]);
+
+  // Role selection logic with auth gate
+  const handleSelectRole = (role: UserRoleType) => {
+    if (role === 'user') {
+      setCurrentRole('user');
+      setIsSidebarOpen(false);
+      return;
+    }
+
+    if (authenticatedRoles[role]) {
+      setCurrentRole(role);
+      setIsSidebarOpen(false);
+    } else {
+      setPendingAuthRole(role);
+      setIsAuthModalOpen(true);
+      setIsSidebarOpen(false);
+    }
   };
 
-  const activeAlertsTotal = watersheds.filter(
-    (w) => w.currentStatus === 'critical' || w.currentStatus === 'stressed'
-  ).length;
+  const handleLoginSuccess = (role: UserRoleType) => {
+    setAuthenticatedRoles((prev) => ({ ...prev, [role]: true }));
+    setCurrentRole(role);
+  };
 
-  // Handle asset status update from field verification
-  const handleAssetStatusUpdated = (assetId: string, newStatus: RechargeAsset['status']) => {
-    setWatersheds((prev) =>
-      prev.map((ws) => {
-        if (ws.id !== selectedWatershedId) return ws;
-        const updatedAssets = ws.assets.map((a) => (a.id === assetId ? { ...a, status: newStatus } : a));
-        const functionalCount = updatedAssets.filter((a) => a.status === 'Functional').length;
-        const needsRepair = updatedAssets.filter((a) => a.status !== 'Functional').length;
+  const handleLogoutRole = (role: UserRoleType) => {
+    setAuthenticatedRoles((prev) => ({ ...prev, [role]: false }));
+    setCurrentRole('user');
+  };
+
+  // --- Complaint & Workflow Handlers ---
+
+  // 1. Citizen submits complaint
+  const handleComplaintSubmitted = (newComplaint: CitizenComplaint) => {
+    setComplaints([newComplaint, ...complaints]);
+  };
+
+  // 2. Nodal Officer assigns Inspector
+  const handleAssignInspector = (
+    complaintId: string,
+    inspectorName: string,
+    inspectorPhone: string
+  ) => {
+    setComplaints((prev) =>
+      prev.map((c) =>
+        c.id === complaintId
+          ? {
+              ...c,
+              status: 'INSPECTOR_ASSIGNED',
+              assignedInspector: inspectorName,
+              assignedInspectorPhone: inspectorPhone,
+            }
+          : c
+      )
+    );
+  };
+
+  // 3. Inspector conducts inspection & logs TDS/Waste source
+  const handleSubmitInspectionReport = (complaintId: string, report: InspectorReport) => {
+    setComplaints((prev) =>
+      prev.map((c) =>
+        c.id === complaintId
+          ? {
+              ...c,
+              status: 'INSPECTION_COMPLETED',
+              inspectionReport: report,
+            }
+          : c
+      )
+    );
+  };
+
+  // 4. Nodal Officer deploys Action Engineer
+  const handleAssignEngineer = (
+    complaintId: string,
+    engineerName: string,
+    engineerPhone: string,
+    deadline: string
+  ) => {
+    setComplaints((prev) =>
+      prev.map((c) => {
+        if (c.id !== complaintId) return c;
+        const workExec: EngineerWorkExecution = {
+          id: `WRK-2026-${Math.floor(100 + Math.random() * 900)}`,
+          engineerName,
+          engineerPhone,
+          assignedAt: new Date().toISOString().slice(0, 10),
+          deadline,
+          status: 'PENDING_ACCEPTANCE',
+          beforePhotoUrl: c.photoUrl,
+        };
         return {
-          ...ws,
-          assets: updatedAssets,
-          functionalAssetsCount: functionalCount,
-          needsRepairCount: needsRepair,
+          ...c,
+          status: 'WORKER_IN_PROGRESS',
+          assignedEngineer: engineerName,
+          assignedEngineerPhone: engineerPhone,
+          workExecution: workExec,
         };
       })
     );
   };
 
-  // Convert simulator scenario to action task
-  const handleApplyScenarioAsTask = (
-    watershedId: string,
-    title: string,
-    category: ActionTask['category']
-  ) => {
-    const newTask: ActionTask = {
-      id: `TASK-SIM-${Date.now().toString().slice(-4)}`,
-      watershedId,
-      title,
-      category,
-      priority: 'HIGH',
-      responsibleAgency: 'Minor Irrigation & Gram Panchayat Joint Cell',
-      assignedOfficer: userRole,
-      deadline: '2026-11-20',
-      status: 'IN_PROGRESS',
-      evidenceSummary: 'Adopted from What-If hydrological simulation model for immediate implementation.',
-    };
+  // 5. Engineer accepts task with Before Photo
+  const handleAcceptTask = (complaintId: string, beforePhotoUrl: string) => {
+    setComplaints((prev) =>
+      prev.map((c) => {
+        if (c.id !== complaintId || !c.workExecution) return c;
+        return {
+          ...c,
+          status: 'WORKER_IN_PROGRESS',
+          workExecution: {
+            ...c.workExecution,
+            status: 'ACCEPTED',
+            beforePhotoUrl,
+            startedAt: new Date().toISOString().slice(0, 10),
+          },
+        };
+      })
+    );
+  };
 
-    setWatersheds((prev) =>
-      prev.map((ws) => {
-        if (ws.id === watershedId) {
-          return {
-            ...ws,
-            tasks: [newTask, ...ws.tasks],
-          };
-        }
-        return ws;
+  // 6. Engineer blocks task with reason
+  const handleBlockTask = (complaintId: string, reason: string) => {
+    setComplaints((prev) =>
+      prev.map((c) => {
+        if (c.id !== complaintId || !c.workExecution) return c;
+        return {
+          ...c,
+          workExecution: {
+            ...c.workExecution,
+            status: 'BLOCKED',
+            blockReason: reason,
+          },
+        };
+      })
+    );
+  };
+
+  // 7. Engineer completes work with After Photo
+  const handleCompleteTask = (complaintId: string, afterPhotoUrl: string, workSummary: string) => {
+    setComplaints((prev) =>
+      prev.map((c) => {
+        if (c.id !== complaintId || !c.workExecution) return c;
+        return {
+          ...c,
+          status: 'VERIFICATION_PENDING',
+          workExecution: {
+            ...c.workExecution,
+            status: 'COMPLETED',
+            afterPhotoUrl,
+            workSummary,
+            completedAt: new Date().toISOString().slice(0, 10),
+          },
+        };
+      })
+    );
+  };
+
+  // 8. Inspector performs post-work site verification
+  const handleSubmitPostWorkVerification = (
+    complaintId: string,
+    isSatisfactory: boolean,
+    photoUrl: string,
+    remarks: string
+  ) => {
+    setComplaints((prev) =>
+      prev.map((c) => {
+        if (c.id !== complaintId) return c;
+
+        const updatedReport: InspectorReport | undefined = c.inspectionReport
+          ? {
+              ...c.inspectionReport,
+              postWorkVerification: {
+                verifiedAt: new Date().toISOString().slice(0, 10),
+                isSatisfactory,
+                verificationPhotoUrl: photoUrl,
+                remarks,
+              },
+            }
+          : undefined;
+
+        return {
+          ...c,
+          status: isSatisfactory ? 'RESOLVED' : 'WORKER_IN_PROGRESS',
+          inspectionReport: updatedReport,
+        };
       })
     );
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fbfe] flex flex-col font-['Plus_Jakarta_Sans',sans-serif] text-slate-800">
-      {/* Top National Portal Navigation Header */}
-      <HeaderNavbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        selectedRole={userRole}
-        setSelectedRole={setUserRole}
-        activeAlertsCount={activeAlertsTotal}
-        endangeredComplaintsCount={complaints.length}
-        onOpenReportEndangered={() => setIsReportEndangeredModalOpen(true)}
+    <div className="min-h-screen bg-slate-50 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] w-full">
+      {/* 1. Slide-out Vertical Drawer for 5 Roles (Doesn't shrink screen) */}
+      <NirikshanVerticalSidebar
+        currentRole={currentRole}
+        onSelectRole={handleSelectRole}
+        authenticatedRoles={authenticatedRoles}
+        onLogoutRole={handleLogoutRole}
+        onOpenLodgeModal={() => setIsLodgeModalOpen(true)}
+        onOpenDirectoryModal={() => setIsDirectoryModalOpen(true)}
+        totalComplaintsCount={complaints.length}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
-        {activeTab === 'map' && (
-          <InteractiveMapDashboard
-            watersheds={watersheds}
-            selectedWatershedId={selectedWatershedId}
-            onSelectWatershed={(id) => setSelectedWatershedId(id)}
-            onOpenDetailModal={() => setIsDetailModalOpen(true)}
-            onOpenLedger={() => setActiveTab('ledger')}
-            onOpenSimulator={() => setActiveTab('simulator')}
-          />
-        )}
+      {/* 2. Top Header Bar with Three Dot Menu Button */}
+      <NirikshanTopBar
+        currentRole={currentRole}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        onOpenLodgeModal={() => setIsLodgeModalOpen(true)}
+        onOpenDirectoryModal={() => setIsDirectoryModalOpen(true)}
+        totalComplaintsCount={complaints.length}
+      />
 
-        {activeTab === 'ledger' && (
-          <AccountabilityLedgerView
-            watersheds={watersheds}
-            selectedWatershedId={selectedWatershedId}
-            onSelectWatershed={(id) => setSelectedWatershedId(id)}
-          />
-        )}
-
-        {activeTab === 'assets' && (
-          <RechargeAssetRegistry
-            watersheds={watersheds}
-            selectedWatershedId={selectedWatershedId}
-            onSelectWatershed={(id) => setSelectedWatershedId(id)}
-            userRole={userRole}
-            onAssetStatusUpdated={handleAssetStatusUpdated}
-          />
-        )}
-
-        {activeTab === 'simulator' && (
-          <InterventionSimulator
-            watersheds={watersheds}
-            selectedWatershedId={selectedWatershedId}
-            onSelectWatershed={(id) => setSelectedWatershedId(id)}
-            onApplyScenarioAsTask={handleApplyScenarioAsTask}
-          />
-        )}
-
-        {activeTab === 'tasks' && (
-          <ActionCenter
-            watersheds={watersheds}
-            selectedWatershedId={selectedWatershedId}
-            onSelectWatershed={(id) => setSelectedWatershedId(id)}
-            userRole={userRole}
-          />
-        )}
-
-        {activeTab === 'audit' && (
-          <SeasonalImpactAudit
-            watersheds={watersheds}
-            selectedWatershedId={selectedWatershedId}
-            onSelectWatershed={(id) => setSelectedWatershedId(id)}
-          />
-        )}
-
-        {activeTab === 'stakeholders' && (
-          <StakeholderEngagementDashboard
-            watersheds={watersheds}
-            selectedWatershedId={selectedWatershedId}
-            onSelectWatershed={(id) => setSelectedWatershedId(id)}
-            userRole={userRole}
-          />
-        )}
-
-        {activeTab === 'complaints' && (
-          <EndangeredComplaintsFeed
+      {/* 3. 100% Full-Width Main Dashboard Area (Never halved or cut) */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 py-6">
+        {/* 1. Citizen / Normal User Dashboard */}
+        {currentRole === 'user' && (
+          <CitizenDashboard
             complaints={complaints}
-            watersheds={watersheds}
-            onOpenReportModal={() => setIsReportEndangeredModalOpen(true)}
-            onSelectWatershed={(id) => {
-              setSelectedWatershedId(id);
-              setActiveTab('map');
-            }}
+            waterBodies={waterBodies}
+            onOpenLodgeModal={() => setIsLodgeModalOpen(true)}
+            onOpenDirectoryModal={() => setIsDirectoryModalOpen(true)}
           />
         )}
 
-        {activeTab === 'sources' && <DataIntegritySourcePanel />}
+        {/* 2. Admin Dashboard (State-wide AP) */}
+        {currentRole === 'admin' && (
+          <AdminDashboard
+            waterBodies={waterBodies}
+            complaints={complaints}
+            officers={officers}
+            onOpenDirectoryModal={() => setIsDirectoryModalOpen(true)}
+          />
+        )}
+
+        {/* 3. Nodal Officer - Vizianagaram */}
+        {currentRole === 'nodal_vizianagaram' && (
+          <NodalOfficerDashboard
+            district="Vizianagaram"
+            complaints={complaints}
+            waterBodies={waterBodies}
+            officers={officers}
+            onAssignInspector={handleAssignInspector}
+            onAssignEngineer={handleAssignEngineer}
+          />
+        )}
+
+        {/* 4. Nodal Officer - Parvathipuram Manyam */}
+        {currentRole === 'nodal_parvathipuram' && (
+          <NodalOfficerDashboard
+            district="Parvathipuram Manyam"
+            complaints={complaints}
+            waterBodies={waterBodies}
+            officers={officers}
+            onAssignInspector={handleAssignInspector}
+            onAssignEngineer={handleAssignEngineer}
+          />
+        )}
+
+        {/* 5. Field Inspector Mobile Workstation */}
+        {currentRole === 'inspector' && (
+          <InspectorDashboard
+            complaints={complaints}
+            waterBodies={waterBodies}
+            onSubmitInspectionReport={handleSubmitInspectionReport}
+            onSubmitPostWorkVerification={handleSubmitPostWorkVerification}
+          />
+        )}
+
+        {/* 6. Action Worker / Engineer Mobile Workstation */}
+        {currentRole === 'engineer' && (
+          <EngineerDashboard
+            complaints={complaints}
+            waterBodies={waterBodies}
+            onAcceptTask={handleAcceptTask}
+            onBlockTask={handleBlockTask}
+            onCompleteTask={handleCompleteTask}
+          />
+        )}
       </main>
 
-      {/* Report Endangered Zone / Complain Modal */}
-      <ReportEndangeredModal
-        isOpen={isReportEndangeredModalOpen}
-        onClose={() => setIsReportEndangeredModalOpen(false)}
-        watersheds={watersheds}
-        defaultWatershedId={selectedWatershedId}
-        onComplaintSubmitted={handleComplaintSubmitted}
-      />
-
-      {/* Deep-Dive Water Profile Modal */}
-      {isDetailModalOpen && (
-        <WatershedProfileModal
-          watershed={selectedWatershed}
-          onClose={() => setIsDetailModalOpen(false)}
-          onOpenSimulator={() => {
-            setIsDetailModalOpen(false);
-            setActiveTab('simulator');
-          }}
-          onOpenLedger={() => {
-            setIsDetailModalOpen(false);
-            setActiveTab('ledger');
-          }}
-          onOpenAssets={() => {
-            setIsDetailModalOpen(false);
-            setActiveTab('assets');
-          }}
-          onOpenStakeholders={() => {
-            setIsDetailModalOpen(false);
-            setActiveTab('stakeholders');
-          }}
-        />
-      )}
-
-      {/* Institutional Footer */}
-      <footer className="w-full bg-[#1b2a4a] text-slate-300 text-xs py-8 border-t border-blue-900 mt-12">
-        <div className="max-w-7xl mx-auto px-4 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-blue-900/60 pb-6">
+      {/* Footer */}
+      <footer className="w-full bg-[#1b2a4a] text-slate-300 text-xs py-6 border-t border-blue-900 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
+              <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
                 <Droplets className="w-5 h-5" />
               </div>
               <div>
                 <h4 className="text-white font-bold text-sm">
-                  JalDrishti — National Micro-Watershed Accountability Grid
+                  Nir-ikshan (नीर-ईक्षण) — Andhra Pradesh Water Surveillance Ecosystem
                 </h4>
-                <p className="text-blue-300 text-xs">
-                  Seva First Innovation Challenge (SFIC 2026) • Track A & Track B Solution
+                <p className="text-blue-300 text-[11px]">
+                  Vizianagaram & Parvathipuram Manyam Districts • Water Resources Dept. AP
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="bg-blue-900 text-sky-200 px-3 py-1 rounded-md border border-blue-700 text-xs font-mono">
-                Theme 2: Samriddh Annadata, Samriddh Bharat
-              </span>
-              <span className="bg-emerald-950 text-emerald-300 px-3 py-1 rounded-md border border-emerald-800 text-xs font-mono">
-                South Zone Nodal: IISc Bengaluru
-              </span>
-            </div>
+            <button
+              onClick={() => setIsDirectoryModalOpen(true)}
+              className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Phone className="w-3.5 h-3.5 text-amber-300" />
+              <span>Verified Officer Contacts</span>
+            </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 border-t border-blue-900/60 pt-3">
             <div>
-              <div className="text-white font-semibold mb-2">Statutory Groundwater Data</div>
-              <ul className="space-y-1 text-slate-400">
-                <li><a href="https://cgwb.gov.in" target="_blank" rel="noreferrer" className="hover:text-sky-300 flex items-center gap-1">Central Ground Water Board (CGWB) <ExternalLink className="w-3 h-3" /></a></li>
-                <li><a href="https://indiawris.gov.in" target="_blank" rel="noreferrer" className="hover:text-sky-300 flex items-center gap-1">India-WRIS Water Portal <ExternalLink className="w-3 h-3" /></a></li>
-                <li><a href="https://nwdp.nwic.gov.in" target="_blank" rel="noreferrer" className="hover:text-sky-300 flex items-center gap-1">NWIC Telemetric DWLR <ExternalLink className="w-3 h-3" /></a></li>
-              </ul>
+              5-Role Architecture: Admin • Citizen • Vizianagaram Nodal • Parvathipuram Nodal • Inspector • Worker
             </div>
-
-            <div>
-              <div className="text-white font-semibold mb-2">Space & Earth Observation</div>
-              <ul className="space-y-1 text-slate-400">
-                <li><a href="https://bhuvan.nrsc.gov.in" target="_blank" rel="noreferrer" className="hover:text-sky-300 flex items-center gap-1">ISRO Bhuvan Geospatial <ExternalLink className="w-3 h-3" /></a></li>
-                <li>Sentinel-2 High-Resolution MSI</li>
-                <li>Cartosat-3 High Res Demarcation</li>
-              </ul>
+            <div className="font-mono text-emerald-400">
+              Staff Credentials: admin@nir.com / 1234
             </div>
-
-            <div>
-              <div className="text-white font-semibold mb-2">Governance & Delivery (Track B)</div>
-              <ul className="space-y-1 text-slate-400">
-                <li>Gram Panchayat Jal Suraksha Samiti</li>
-                <li>MGNREGS Asset Geo-tagging</li>
-                <li>Jal Jeevan Mission Source Sustainability</li>
-              </ul>
-            </div>
-
-            <div>
-              <div className="text-white font-semibold mb-2">Zero Fabricated Data Guarantee</div>
-              <p className="text-slate-400 leading-relaxed text-[11px]">
-                Groundwater telemetry is verified against official DWLR piezometers. Missing records are marked DATA UNAVAILABLE; simulated models are marked MODELLED ESTIMATE.
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-blue-900/40 text-center text-slate-400 text-[11px] font-mono">
-            Designed for National Level Hackathon • Seva First Innovation Challenge (SFIC) under Seva Sankalp Abhiyan @ Viksit Bharat 2047
           </div>
         </div>
       </footer>
+
+      {/* Lodge Complaint Modal (No login required) */}
+      <LodgeComplaintModal
+        isOpen={isLodgeModalOpen}
+        onClose={() => setIsLodgeModalOpen(false)}
+        onComplaintSubmitted={handleComplaintSubmitted}
+      />
+
+      {/* Officer Directory Modal */}
+      <OfficerDirectoryModal
+        isOpen={isDirectoryModalOpen}
+        onClose={() => setIsDirectoryModalOpen(false)}
+        officers={officers}
+      />
+
+      {/* Authentication Gate Modal (admin@nir.com / 1234) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        targetRole={pendingAuthRole}
+        onLoginSuccess={handleLoginSuccess}
+      />
     </div>
   );
 }
