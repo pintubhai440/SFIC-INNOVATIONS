@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WaterBody, CitizenComplaint, WaterBodyStatusColor, UserRoleType } from '../types/nirikshan';
 import { 
   MapPin, 
@@ -45,6 +45,27 @@ export const InteractiveAndhraMap: React.FC<InteractiveAndhraMapProps> = ({
   const [showComplaints, setShowComplaints] = useState(true);
   const [activeWaterBody, setActiveWaterBody] = useState<WaterBody | null>(waterBodies[0] || null);
   const [activeComplaint, setActiveComplaint] = useState<CitizenComplaint | null>(null);
+
+  // 1. Data store karne ke liye ek 'Jhola' (state) banao
+  const [liveReservoirData, setLiveReservoirData] = useState<any>(null);
+
+  // 2. Component load hote hi Vercel se data mangwao (Antenna)
+  useEffect(() => {
+    async function getLiveData() {
+      try {
+        const res = await fetch('/api/wris'); // Apne Vercel API ko pukaara
+        const realData = await res.json();
+        
+        setLiveReservoirData(realData); // Data aate hi jhole me daal diya
+        console.log("Live Water Data aa gaya:", realData); // Browser console me check karne ke liye
+      } catch (err) {
+        console.error("Data laane me error:", err);
+      }
+    }
+    
+    getLiveData();
+  }, []); // Yeh empty array [] ka matlab hai "sirf ek baar mangwao jab map pehli baar khule"
+
 
   // Filter water bodies based on role restriction
   const effectiveDistrict = 
