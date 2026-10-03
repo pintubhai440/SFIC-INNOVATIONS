@@ -1,42 +1,46 @@
 // api/wris.js
 
 export default async function handler(req, res) {
-  // 1. CORS Headers (Gareebo ka Bouncer)
+  // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // 2. Pre-flight OPTIONS bypass
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   try {
-    // 3. GET aur POST dono ka swagat hai!
-    // Agar GET request aayi, toh URL query parameters se data nikalenge
-    // Agar POST request aayi, toh body se nikalenge
-    const endpoint = req.method === 'POST' ? req.body.endpoint : req.query.endpoint;
-    
-    // Default payload set kar dete hain taaki GET request me error na aaye
-    const payload = req.method === 'POST' ? req.body.payload : {
-      state: req.query.state || "Andhra Pradesh",
-      district: req.query.district || "Vizianagaram",
-      startDate: req.query.startDate || new Date().toISOString().split('T')[0],
-      endDate: req.query.endDate || new Date().toISOString().split('T')[0]
-    };
+    let endpoint = '';
+    let payload = {};
 
-    if (!endpoint) {
-      // Agar direct koi link khol de bina endpoint bataye
-      return res.status(400).json({ error: 'Frontend se API endpoint missing hai bhai!' });
+    // 2. Agar POST request hai, toh Frontend ka data use karo
+    if (req.method === 'POST') {
+      endpoint = req.body?.endpoint || '/Dataset/Reservoir';
+      payload = req.body?.payload || {
+        state: "Andhra Pradesh",
+        district: "Vizianagaram",
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0]
+      };
+    } 
+    // 3. Agar browser galti se GET bhej de, toh Default data use karo
+    else {
+      endpoint = req.query?.endpoint || '/Dataset/Reservoir';
+      payload = {
+        state: req.query?.state || "Andhra Pradesh",
+        district: req.query?.district || "Vizianagaram",
+        startDate: req.query?.startDate || new Date().toISOString().split('T')[0],
+        endDate: req.query?.endDate || new Date().toISOString().split('T')[0]
+      };
     }
 
-    // 4. India-WRIS ka Data API URL structure
+    // 4. WRIS Server ko call lagao (Wo humesha POST hi leta hai)
     const wrisBaseUrl = "https://indiawris.gov.in/wris-api"; 
     const targetUrl = `${wrisBaseUrl}${endpoint}`;
 
-    // 5. Hum humesha WRIS ko POST bhejenge, chahe humare paas GET aaye ya POST
     const response = await fetch(targetUrl, {
-      method: 'POST',
+      method: 'POST', 
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
